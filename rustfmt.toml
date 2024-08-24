@@ -1,0 +1,26 @@
+# Set the maximum line width for formatting
+max_width = 120
+
+# Use Unix line endings (LF)
+newline_style = "Unix"
+
+# Use spaces rather than tabs
+hard_tabs = false
+
+# The number of spaces per tab
+tab_spaces = 4
+
+# Control the alignment of match arms
+match_arm_blocks = true
+
+# Merge imports into a single line if possible
+merge_imports = true
+
+# Enable reordering of imports
+reorder_imports = true
+
+# Allow short attributes to be on the same line
+wrap_comments = true
+
+# Prevent rustfmt from adding spaces inside brackets
+space_in_brackets = false

@@ -1,24 +1,45 @@
-use std::error::Error;
-use async_openai::Client;
 use async_openai::types::{ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
-use axum::extract::Query;
-use axum::response::{IntoResponse, Sse};
-use axum::response::sse::Event;
-use tokio::sync::mpsc;
+use async_openai::Client as OpenaiClient;
+use axum::{
+    extract::{Path, Query, State},
+    response::sse::Event,
+    response::{IntoResponse, Sse},
+};
+use futures::{FutureExt, StreamExt};
+use mongodb::bson::uuid;
+use mongodb::{Client as MongoClient, Collection};
+use serde::{Deserialize, Serialize};
+use std::error::Error;
+use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
-use futures::{StreamExt, FutureExt};
-
+use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
 pub struct ChatParams {
     prompt: String,
 }
 
-pub async fn chat_stream_handler(Query(params): Query<ChatParams>) -> impl IntoResponse {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ChatRecord {
+    userid: Uuid,
+    chatid: Uuid,
+    prompt: String,
+    response: String,
+}
+
+type ChatQueue = Arc<Mutex<mpsc::Sender<ChatRecord>>>;
+
+pub async fn chat_stream_handler(
+    Path((userid, chatid)): Path<(Uuid, Uuid)>,
+    Query(params): Query<ChatParams>,
+    State(chat_queue): State<ChatQueue>,
+) -> impl IntoResponse {
     let (tx, rx) = mpsc::channel(100);
+    let chat_queue_clone = Arc::clone(&chat_queue);
 
     tokio::spawn(async move {
-        if let Err(e) = generate_chat_stream(params.prompt, tx).await {
+        if let Err(e) = generate_chat_stream(params.prompt.as_str(), tx, chat_queue_clone, userid, chatid).await {
             println!("failed to stream chat: {}", e);
         }
     });
@@ -27,9 +48,14 @@ pub async fn chat_stream_handler(Query(params): Query<ChatParams>) -> impl IntoR
     Sse::new(stream.map(|msg| Ok::<_, std::convert::Infallible>(Event::default().data(msg))))
 }
 
-
-pub async fn generate_chat_stream(prompt: String, tx: mpsc::Sender<String>) -> Result<(), Box<dyn Error>> {
-    let client = Client::new();
+pub async fn generate_chat_stream(
+    prompt: &str,
+    tx: mpsc::Sender<String>,
+    chat_queue: ChatQueue,
+    userid: Uuid,
+    chatid: Uuid,
+) -> Result<(), Box<dyn Error>> {
+    let openai_client = OpenaiClient::new();
     let mut accumulated_content = String::new();
 
     let request = CreateChatCompletionRequestArgs::default()
@@ -41,7 +67,7 @@ pub async fn generate_chat_stream(prompt: String, tx: mpsc::Sender<String>) -> R
             .into()])
         .build()?;
 
-    let mut stream = client.chat().create_stream(request).await?;
+    let mut stream = openai_client.chat().create_stream(request).await?;
 
     while let Some(result) = stream.next().await {
         match result {
@@ -63,7 +89,34 @@ pub async fn generate_chat_stream(prompt: String, tx: mpsc::Sender<String>) -> R
             }
         }
     }
+
+    let chat_record = ChatRecord {
+        userid,
+        chatid,
+        prompt: prompt.to_string(),
+        response: accumulated_content.clone(),
+    };
+
+    if let Err(e) = chat_queue.lock().await.send(chat_record).await {
+        eprintln!("failed to push job to queue: {}", e);
+    }
+
     println!("generated sentences: {:?}", accumulated_content);
 
     Ok(())
 }
+
+// pub async fn consume_job_queue(chat_queue: ChatQueue, db_client: MongoClient) -> Result<(), Box<dyn Error>> {
+//     let collection: Collection<ChatRecord> = db_client.database("chat_db").collection("chat_records");
+//
+//     let mut rx = chat_queue.lock().await.clone().subscribe();
+//
+//     while let Some(job) = rx.recv().await {
+//         // Insert the job (input-output pair) into MongoDB
+//         if let Err(e) = collection.insert_one(job, None).await {
+//             eprintln!("failed to insert job into MongoDB: {}", e);
+//         }
+//     }
+//
+//     Ok(())
+// }
