@@ -101,22 +101,19 @@ pub async fn generate_chat_stream(
         eprintln!("failed to push job to queue: {}", e);
     }
 
-    println!("generated sentences: {:?}", accumulated_content);
 
     Ok(())
 }
 
-// pub async fn consume_job_queue(chat_queue: ChatQueue, db_client: MongoClient) -> Result<(), Box<dyn Error>> {
-//     let collection: Collection<ChatRecord> = db_client.database("chat_db").collection("chat_records");
-//
-//     let mut rx = chat_queue.lock().await.clone().subscribe();
-//
-//     while let Some(job) = rx.recv().await {
-//         // Insert the job (input-output pair) into MongoDB
-//         if let Err(e) = collection.insert_one(job, None).await {
-//             eprintln!("failed to insert job into MongoDB: {}", e);
-//         }
-//     }
-//
-//     Ok(())
-// }
+pub async fn insert_to_db_from_queue( mut rx: mpsc::Receiver<ChatRecord>) -> Result<(), Box<dyn Error>> {
+    // let collection: Collection<ChatRecord> = db_client.database("chat_db").collection("chat_records");
+
+    while let Some(job) = rx.recv().await {
+        println!("consumed: {:?}", job);
+        // // Insert the job (input-output pair) into MongoDB
+        // if let Err(e) = collection.insert_one(job).await {
+        //     eprintln!("failed to insert job into MongoDB: {}", e);
+        // }
+    }
+    Ok(())
+}
