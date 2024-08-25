@@ -21,3 +21,5 @@ A simple openai chat streaming server written in rust
 4. curl example
     - `GET http://localhost:3000/chat-stream/{userid(uuid}/{chatid(uiuid}?prompt='{user prompt}'`
     - `GET http://localhost:3000/chat-stream/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d?prompt='My dog is vomitting. Should I go to a vet?'`
+5. Swagger-ui
+    - `http://localhost:3000/swagger-ui`

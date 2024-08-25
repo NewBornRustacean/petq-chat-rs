@@ -14,13 +14,14 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
+use utoipa::{ToSchema, IntoParams};
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, ToSchema, IntoParams)]
 pub struct ChatParams {
     prompt: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, ToSchema, IntoParams)]
 pub struct ChatRecord {
     userid: Uuid,
     chatid: Uuid,
@@ -30,6 +31,20 @@ pub struct ChatRecord {
 
 type ChatQueue = Arc<Mutex<mpsc::Sender<ChatRecord>>>;
 
+
+#[utoipa::path(
+    get,
+    path = "/chat-stream/{userid}/{chatid}",
+    params(
+        ("userid" = Uuid, Path, description = "User ID"),
+        ("chatid" = Uuid, Path, description = "Chat ID"),
+        ChatParams
+    ),
+    responses(
+        (status = 200, description = "Successful chat stream", body = String),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 pub async fn chat_stream_handler(
     Path((userid, chatid)): Path<(Uuid, Uuid)>,
     Query(params): Query<ChatParams>,
