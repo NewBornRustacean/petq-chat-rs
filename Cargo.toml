@@ -15,4 +15,7 @@ mongodb = "3.0.1"
 uuid = "1.10.0"
 utoipa = { version = "4", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "7", features = ["axum"] }
+async-stream = "0.3.5"
+hyper = "1.4.1"
+anyhow = "1.0.86"
 
