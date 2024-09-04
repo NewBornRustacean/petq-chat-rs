@@ -18,4 +18,6 @@ utoipa-swagger-ui = { version = "7", features = ["axum"] }
 async-stream = "0.3.5"
 hyper = "1.4.1"
 anyhow = "1.0.86"
+tower-http = { version = "0.5.2", features = ["cors"] }
+http = "1.1.0"
 
