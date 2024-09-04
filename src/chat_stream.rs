@@ -174,7 +174,7 @@ async fn generate_chat_stream(
         prompt: prompt.to_string(),
         response: accumulated_content.clone(),
     };
-
+    println!("{:?}", accumulated_content);
     let mut chats = chat_collection.lock().unwrap();
     chats.insert(chatid.to_string(), chat_record);
 
