@@ -137,7 +137,7 @@ async fn generate_chat_stream(
     let mut accumulated_content = String::new();
 
     let request = CreateChatCompletionRequestArgs::default()
-        .model("gpt-4")
+        .model("gpt-4o-mini")
         .max_tokens(512u32)
         .messages([ChatCompletionRequestUserMessageArgs::default()
             .content(prompt)
