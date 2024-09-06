@@ -12,10 +12,14 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio_stream::wrappers::ReceiverStream;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
+
+use crate::memory::SlidingWindow;
+
 
 #[derive(Deserialize, ToSchema, IntoParams)]
 pub struct ChatParams {
@@ -26,8 +30,7 @@ pub struct ChatParams {
 pub struct ChatRecord {
     userid: Uuid,
     chatid: Uuid,
-    prompt: String,
-    response: String,
+    window: SlidingWindow, // Use SlidingWindow instead of plain strings
 }
 
 type SharedState = (Arc<Mutex<HashMap<String, ChatRecord>>>, Arc<OpenaiClient<OpenAIConfig>>);
@@ -136,11 +139,28 @@ async fn generate_chat_stream(
 ) -> Result<(), Box<dyn Error>> {
     let mut accumulated_content = String::new();
 
+    // Lock the chat collection and retrieve or create a chat record for the given chatid
+    let mut chats = chat_collection.lock().await;
+
+    // Retrieve the chat record for this chatid, or create it with a new sliding window
+    let chat_record = chats.entry(chatid.to_string()).or_insert_with(|| ChatRecord {
+        userid,
+        chatid,
+        window: SlidingWindow::new(5), // This only happens once when the chatid is first encountered
+    });
+
+    // Add the user's current prompt to the sliding window
+    chat_record.window.add(format!("User: {}", prompt));
+
+    // Get the sliding window content as conversation history
+    let history = chat_record.window.to_string();
+
+    // Build the request with the sliding window history included in the prompt
     let request = CreateChatCompletionRequestArgs::default()
-        .model("gpt-4")
+        .model("gpt-4o-mini")
         .max_tokens(512u32)
         .messages([ChatCompletionRequestUserMessageArgs::default()
-            .content(prompt)
+            .content(format!("Conversation history:\n{}\nUser: {}", history, prompt)) // Include history
             .build()?
             .into()])
         .build()?;
@@ -168,15 +188,6 @@ async fn generate_chat_stream(
         }
     }
 
-    let chat_record = ChatRecord {
-        userid,
-        chatid,
-        prompt: prompt.to_string(),
-        response: accumulated_content.clone(),
-    };
     println!("{:?}", accumulated_content);
-    let mut chats = chat_collection.lock().unwrap();
-    chats.insert(chatid.to_string(), chat_record);
-
     Ok(())
 }
