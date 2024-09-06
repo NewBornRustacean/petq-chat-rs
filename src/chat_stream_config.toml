@@ -1,0 +1,10 @@
+# Model configurations
+llm_to_use = "gpt-4o-mini"   # or gpt-3.5, etc.
+max_tokens = 512
+context_lenth = 4000
+
+# Chat configurations
+sliding_window_size = 5
+
+# API client configurations
+client_url = "https://localhost:3001"

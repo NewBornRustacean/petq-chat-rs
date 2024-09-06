@@ -20,4 +20,5 @@ hyper = "1.4.1"
 anyhow = "1.0.86"
 tower-http = { version = "0.5.2", features = ["cors"] }
 http = "1.1.0"
+toml = "0.8.19"
 
